@@ -4,6 +4,7 @@ var httpProxy = require('http-proxy');
 var request = require('request');
 var router = express.Router();
 var DOMParser = require('dom-parser');
+var cheerio = require('cheerio');
 
 var proxy = httpProxy.createProxyServer({});
 
@@ -18,6 +19,10 @@ router.get('/', function(req, res, next) {
 router.get('/api/*', function(req, res, next) {
     // res.render('index', { title: 'Express' });
     var url = req.params[0];
+    var splits = url.split('/');
+    console.log(splits);
+    var url2 = splits[0]+"//" + splits[2];
+    var dat = "";
     console.log('asdasdsa' + url);
     request({method: 'GET', uri: url}, function(error, response, body){
         // console.log('error', error);
@@ -25,31 +30,28 @@ router.get('/api/*', function(req, res, next) {
         // console.log('body', body);
     }).on('data', function(data){
         // console.log('chunk is '+ data);
-        data = data.toString().replace(/href="\//g, `href="${req.params[0]}/`);
-        data = data.replace(/url\(\//g, `url(${req.params[0]}/`);
-        data = data.replace(/'\//g, `'${req.params[0]}/`);
-        data = data.replace(/src="\//g, `src="${req.params[0]}/`);
-        var dom = parser.parseFromString(data);
-        var x;
-        x = dom.getElementsByTagName("a");
-        for(var i =0; i<x.length; i++){
-            console.log(x[i].attributes);
-            for(var j = 0; j<x[i].attributes.length; j++){
-                if(x[i].attributes[j].name == 'href'){
-                    x[i].attributes[j].value = "/api/" + x[i].attributes[j].value;
-                }
-            }
-        }
-        console.log(dom);
-        console.log("");
-        console.log("");
-        res.write(dom['rawHTML']);
+        data = data.toString().replace(/"\/\//g, `"${splits[0]}//`);
+        data = data.replace(/'\/\//g, `'${splits[0]}//`);
+        data = data.replace(/url\(\/\//g, `url(${splits[0]}//`);
+        data = data.replace(/"\//g, `"${url2}/`);
+        data = data.replace(/url\(\//g, `url(${url2}/`);
+        data = data.replace(/'\//g, `'${url2}/`);
+        dat += data;
     }).on('response', function(response){
         response.on('data', function(data){
             // console.log('response is ' + data);
             // res.end();
         });
     }).on('end', function(){
+        var dom = cheerio.load(dat, { "recognizeSelfClosing": true });
+        dom("a").each(function(ind, ele){
+            dom(ele).attr("href", "/api/" + dom(ele).attr("href"));
+        });
+        console.log("");
+        console.log("");
+        console.log(dom.html());
+        res.write(dom.html());
+        console.log("end");
         res.end();
     });
 });
